@@ -33,7 +33,7 @@
   },
   "scripts": {
     "build": "rollup -c",
-    "serve": "node server/index.js"
+    "serve": "node demoserver/index.js"
   },
   "license": "MIT",
   "repository": {
