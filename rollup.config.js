@@ -1,38 +1,47 @@
 import nodeResolve from 'rollup-plugin-node-resolve';
 import json from 'rollup-plugin-json';
 import commonjs from 'rollup-plugin-commonjs';
-import buble from 'rollup-plugin-buble';
-import copy from 'rollup-plugin-copy';
+import babel from 'rollup-plugin-babel';
+import replace from 'rollup-plugin-replace';
 
-let globals = {},
+let globals = {
+    '@babel/runtime/regenerator': 'regeneratorRuntime'
+  },
   external = [];
 'model transform state view keymap inputrules history commands schema-basic schema-list dropcursor menu example-setup gapcursor'
   .split(' ')
   .forEach((name) => {
     globals['prosemirror-' + name] = 'PM.' + name.replace(/-/g, '_');
-    external.push('prosemirror-' + name);
+    // external.push('prosemirror-' + name);
   });
 
 export default {
-  input: './client/collab.js',
+  input: './client/index.js',
   plugins: [
-    copy({
-      targets: [
-        'node_modules/prosemirror-view/style/prosemirror.css',
-        'node_modules/prosemirror-menu/style/menu.css',
-        'node_modules/prosemirror-gapcursor/style/gapcursor.css',
-        'node_modules/prosemirror-example-setup/style/style.css',
-        'node_modules/codemirror/lib/codemirror.css'
-      ],
-      // outputFolder: 'public/styles',
-      // hook: 'buildStart',
-      verbose: true
-    }),
-    nodeResolve({ main: true, preferBuiltins: false }),
+    nodeResolve({ main: true, preferBuiltins: false, browser: true }),
     json(),
-    commonjs(),
-    buble()
+    commonjs({
+      include: 'node_modules/**'
+    }),
+    babel({
+      exclude: 'node_modules/**',
+      babelrc: false,
+      runtimeHelpers: true,
+      presets: [['@babel/env', { modules: false }]],
+      plugins: [
+        '@babel/plugin-transform-runtime',
+        '@babel/plugin-proposal-object-rest-spread'
+      ]
+    }),
+    replace({
+      'process.env.NODE_ENV': JSON.stringify('development')
+    })
   ],
   // external,
-  output: { format: 'iife', file: './public/collab.js' }
+  output: {
+    format: 'iife',
+    file: './public/collab.js',
+    globals,
+    sourcemap: true
+  }
 };

@@ -29,3 +29,25 @@
 .ProseMirror p {
   margin-bottom: 1em;
 }
+
+.hidden {
+  display: none !important;
+}
+
+ol.doc-list {
+  width: 300px;
+}
+
+ol.doc-list li {
+  cursor: pointer;
+  margin-bottom: 10px;
+  color: #1870a7;
+}
+
+#docinfo,
+#doclist {
+  padding: 10px 5px;
+  border-left: 3px solid silver;
+  margin: 10px 0;
+  width: 300px;
+}

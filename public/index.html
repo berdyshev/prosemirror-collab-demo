@@ -8,18 +8,31 @@
     <link rel="stylesheet" href="./styles/style.css" />
     <link rel="stylesheet" href="./styles/codemirror.css" />
     <link rel="stylesheet" href="./styles/editor-base.css" />
-  </head>
-  <body>
-    <h1>ProseMirror Collab Demo</h1>
-    <div id="editor"></div>
-    <div class="docinfo">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.1.2/handlebars.min.js"></script>
+    <script id="doclist-template" type="text/x-handlebars-template">
+      Select a document to edit:
+      <ol class="doc-list">
+        {{#each articles}}
+        <li data-name="{{id}}" class="doc-item">{{name}}</li>
+        {{/each}}
+      </ol>
+      <button type="button">Create a new document</button>
+    </script>
+    <script id="docinfo-template" type="text/x-handlebars-template">
       Connected to:
       <span id="connected">
-        <span id="docname">None</span>
+        <strong id="docname">{{name}}</strong>
         <span id="users"></span>
         <button type="button" id="changedoc">Change</button>
       </span>
-    </div>
+    </script>
+  </head>
+  <body>
+    <h1>ProseMirror Collab Demo</h1>
+    <h3 id="welcome" class="hidden"></h3>
+    <div id="doclist" class="hidden"></div>
+    <div id="docinfo" class="hidden"></div>
+    <div id="editor" class="hidden"></div>
     <script src="collab.js"></script>
   </body>
 </html>
