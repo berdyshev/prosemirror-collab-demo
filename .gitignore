@@ -1,4 +1,5 @@
 node_modules
 public/collab.js
+public/collab.js.map
 demo-instances.json
 database.sqlite
