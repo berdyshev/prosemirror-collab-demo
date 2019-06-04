@@ -23,13 +23,13 @@ class Instance {
     if (this.collecting != null) clearInterval(this.collecting);
   }
 
-  addEvents(version, steps, clientID) {
+  addEvents(version, user, steps) {
     this.checkVersion(version);
     if (this.article.version != version) return false;
     let doc = this.article.content,
       maps = [];
     for (let i = 0; i < steps.length; i++) {
-      steps[i].clientID = clientID;
+      steps[i].clientID = user.id;
       let result = steps[i].apply(doc);
       doc = result.doc;
       maps.push(steps[i].getMap());
@@ -42,7 +42,7 @@ class Instance {
 
     this.sendUpdates();
     this.scheduleSave();
-    return { version: this.article.version };
+    return { version: this.article.version, cursors: this.getCursors(user) };
   }
 
   sendUpdates() {
@@ -63,12 +63,25 @@ class Instance {
   // : (Number, Number)
   // Get events between a given document version and
   // the current document version.
-  getEvents(version) {
+  getEvents(version, user) {
     this.checkVersion(version);
     let startIndex = this.steps.length - (this.article.version - version);
     if (startIndex < 0) return false;
 
-    return { steps: this.steps.slice(startIndex), users: this.userCount };
+    return {
+      steps: this.steps.slice(startIndex),
+      users: this.userCount,
+      cursors: this.getCursors(user)
+    };
+  }
+
+  getCursors(user) {
+    return Object.values(this.users)
+      .filter((u) => u.id !== user.id)
+      .map((u) => ({
+        position: u.cursor,
+        user: { id: u.id, name: u.name }
+      }));
   }
 
   collectUsers() {
@@ -86,6 +99,8 @@ class Instance {
     if (!(user.id in this.users)) {
       this._registerUser(user);
       this.sendUpdates();
+    } else if (user.cursor && user.cursor !== this.users[user.id].cursor) {
+      this.users[user.id].cursor = user.cursor;
     }
   }
 

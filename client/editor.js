@@ -13,6 +13,7 @@ import {
 
 import { schema } from './schema';
 import api from './api';
+import cursor from './cursor';
 
 const menu = buildMenuItems(schema);
 
@@ -66,7 +67,8 @@ class EditorConnection {
           menuContent: menu.fullMenu
         }).concat([
           history({ preserveItems: true }),
-          collab({ version: action.version })
+          collab({ version: action.version }),
+          cursor
         ])
       });
       this.state = new State(editState, 'poll');
@@ -87,8 +89,8 @@ class EditorConnection {
       }
     } else if (action.type == 'transaction') {
       newEditState = this.state.edit.apply(action.transaction);
-      console.log('new transaction state', newEditState);
     }
+    console.log('next state', this.state.comm, newEditState);
 
     if (newEditState) {
       let sendable;
@@ -158,7 +160,10 @@ class EditorConnection {
       response = await this.run({
         url: `/collab/events/${this.globalState.currentArticle}`,
         method: 'GET',
-        params: { version: getVersion(this.state.edit) }
+        params: {
+          version: getVersion(this.state.edit),
+          cursor: this.state.edit.selection.head
+        }
       });
     } catch (err) {
       if (axios.isCancel(err)) {
@@ -180,6 +185,10 @@ class EditorConnection {
         response.data.steps.map((j) => Step.fromJSON(schema, j)),
         response.data.clientIDs
       );
+      tr.setMeta(cursor, {
+        type: 'receive',
+        userCursors: response.data.cursors
+      });
       this.dispatch({
         type: 'transaction',
         transaction: tr,
@@ -193,18 +202,22 @@ class EditorConnection {
 
   sendable(editState) {
     let steps = sendableSteps(editState);
-    if (steps) return { steps };
+    if (steps) {
+      return { steps };
+    }
   }
 
   // Send the given steps to the server
-  async send(editState, { steps }) {
+  async send(editState, { steps, ...other }) {
+    let response;
     try {
       let data = {
         version: getVersion(editState),
         steps: steps ? steps.steps.map((s) => s.toJSON()) : [],
-        clientID: steps ? steps.clientID : 0
+        clientID: steps ? steps.clientID : 0,
+        ...other
       };
-      await this.run({
+      response = await this.run({
         url: `/collab/events/${this.globalState.currentArticle}`,
         method: 'POST',
         data
@@ -232,6 +245,12 @@ class EditorConnection {
           repeat(steps.clientID, steps.steps.length)
         )
       : this.state.edit.tr;
+    if (response.data.cursors) {
+      tr.setMeta(cursor, {
+        type: 'receive',
+        userCursors: response.data.cursors
+      });
+    }
     this.dispatch({
       type: 'transaction',
       transaction: tr,

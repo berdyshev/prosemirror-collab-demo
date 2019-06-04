@@ -45,8 +45,9 @@ router.get('/articles/:id', async (req, res) => {
 router.get('/events/:id', async (req, res) => {
   const version = nonNegInteger(req.query.version);
   const user = req.user;
+  user.cursor = nonNegInteger(req.query.cursor);
   const instance = await getInstance(req.params.id, user);
-  const data = instance.getEvents(version);
+  const data = instance.getEvents(version, user);
 
   if (data === false) {
     const err = new Error('History no longer available');
@@ -61,7 +62,9 @@ router.get('/events/:id', async (req, res) => {
   // If the server version matches the given version,
   // wait until a new version is published to return the event data.
   let wait = new Waiting(res, instance, user, () => {
-    wait.send(formatEventsResponse(instance, instance.getEvents(version)));
+    wait.send(
+      formatEventsResponse(instance, instance.getEvents(version, user))
+    );
   });
   instance.waiting.push(wait);
   res.on('close', () => wait.abort());
@@ -72,7 +75,7 @@ router.post('/events/:id', async (req, res) => {
   const version = nonNegInteger(data.version);
   const steps = data.steps.map((s) => Step.fromJSON(schema, s));
   const instance = await getInstance(req.params.id, req.user);
-  const result = instance.addEvents(version, steps, req.user.id);
+  const result = instance.addEvents(version, req.user, steps);
   if (!result) {
     const err = new Error('Version not current');
     err.status = 409;
@@ -85,7 +88,8 @@ function formatEventsResponse(inst, data) {
     version: inst.article.version,
     steps: data.steps.map((s) => s.toJSON()),
     clientIDs: data.steps.map((step) => step.clientID),
-    users: data.users
+    users: data.users,
+    cursors: data.cursors
   };
 }
 

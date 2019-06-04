@@ -51,3 +51,20 @@ ol.doc-list li {
   margin: 10px 0;
   width: 300px;
 }
+
+.cursor {
+  position: relative;
+  border-left: 2px solid #afafaf;
+}
+
+.cursor .username {
+  position: absolute;
+  top: -16px;
+  left: -2px;
+  font-size: 10px;
+  line-height: 10px;
+  background-color: #fff;
+  border: 1px solid #afafaf;
+  padding: 2px;
+  white-space: nowrap;
+}

@@ -23,7 +23,9 @@ if (!state.user) {
 }
 
 async function initApp(user) {
-  document.getElementById('welcome').innerHTML = `Welcome ${user.name}`;
+  const welcomeEl = document.getElementById('welcome');
+  welcomeEl.innerText = `Welcome ${user.name}`;
+  welcomeEl.classList.remove('hidden');
   api.defaults.headers['Auth'] = user.token;
 
   const response = await api.get('/collab/articles');
@@ -31,6 +33,7 @@ async function initApp(user) {
   showDocList();
 }
 
+// Authenticate user by ID.
 async function signIn(userId) {
   const response = await api.post('/auth', { id: userId });
   sessionStorage.setItem('user', JSON.stringify(response.data));
@@ -39,12 +42,14 @@ async function signIn(userId) {
 
 let connection = null;
 
+// init editor for the selected document.
 async function initEditor() {
   if (connection) connection.close();
   connection = window.connection = new EditorConnection(report, state);
   await connection.start();
 }
 
+// Rendering of the list of the articles to select one for editing.
 const docListTemplate = Handlebars.compile(
   document.getElementById('doclist-template').innerHTML
 );
@@ -54,6 +59,7 @@ function showDocList() {
   docListEl.classList.remove('hidden');
 }
 
+// Rendering of the selected document value and Change Doc button.
 const docInfoTemplate = Handlebars.compile(
   document.getElementById('docinfo-template').innerHTML
 );
@@ -66,16 +72,19 @@ function updateDocInfo() {
 
 document.addEventListener('click', async (e) => {
   if (e.target.nodeName == 'LI' && e.target.classList.contains('doc-item')) {
+    // Handler to open an exisiting document (article) from the list.
     document.getElementById('doclist').classList.add('hidden');
     state.currentArticle = parseInt(e.target.getAttribute('data-name'), 10);
     updateDocInfo();
     initEditor();
   } else if (e.target.nodeName === 'BUTTON' && e.target.id === 'create-doc') {
+    // Handler to create new document by entering it's name in the prompt dialog.
     document.getElementById('doclist').classList.add('hidden');
     await newDocument(state);
     updateDocInfo();
     initEditor();
   } else if (e.target.nodeName === 'BUTTON' && e.target.id === 'changedoc') {
+    // handler to open document selector — list with existing articles.
     docInfo.classList.add('hidden');
     showDocList();
   }
