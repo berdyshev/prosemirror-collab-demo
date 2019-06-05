@@ -12,27 +12,18 @@ class Instance {
     this.article = article;
     this.steps = [];
     this.lastActive = Date.now();
-    this.users = Object.create(null);
-    this.userCount = 0;
-    this.waiting = [];
-
-    this.collecting = null;
   }
 
-  stop() {
-    if (this.collecting != null) clearInterval(this.collecting);
-  }
+  stop() {}
 
   addEvents(version, user, steps) {
     this.checkVersion(version);
     if (this.article.version != version) return false;
-    let doc = this.article.content,
-      maps = [];
+    let doc = this.article.content;
     for (let i = 0; i < steps.length; i++) {
       steps[i].clientID = user.id;
       let result = steps[i].apply(doc);
       doc = result.doc;
-      maps.push(steps[i].getMap());
     }
     this.article.content = doc;
     this.article.version += steps.length;
@@ -40,13 +31,9 @@ class Instance {
     if (this.steps.length > MAX_STEP_HISTORY)
       this.steps = this.steps.slice(this.steps.length - MAX_STEP_HISTORY);
 
-    this.sendUpdates();
+    // this.sendUpdates();
     this.scheduleSave();
-    return { version: this.article.version, cursors: this.getCursors(user) };
-  }
-
-  sendUpdates() {
-    while (this.waiting.length) this.waiting.pop().finish();
+    return { version: this.article.version };
   }
 
   // : (Number)
@@ -60,59 +47,6 @@ class Instance {
     }
   }
 
-  // : (Number, Number)
-  // Get events between a given document version and
-  // the current document version.
-  getEvents(version, user) {
-    this.checkVersion(version);
-    let startIndex = this.steps.length - (this.article.version - version);
-    if (startIndex < 0) return false;
-
-    return {
-      steps: this.steps.slice(startIndex),
-      users: this.userCount,
-      cursors: this.getCursors(user)
-    };
-  }
-
-  getCursors(user) {
-    return Object.values(this.users)
-      .filter((u) => u.id !== user.id)
-      .map((u) => ({
-        position: u.cursor,
-        user: { id: u.id, name: u.name }
-      }));
-  }
-
-  collectUsers() {
-    const oldUserCount = this.userCount;
-    this.users = Object.create(null);
-    this.userCount = 0;
-    this.collecting = null;
-    this.waiting.forEach(({ user }) => this._registerUser(user));
-    if (this.userCount != oldUserCount) {
-      this.sendUpdates();
-    }
-  }
-
-  registerUser(user) {
-    if (!(user.id in this.users)) {
-      this._registerUser(user);
-      this.sendUpdates();
-    } else if (user.cursor && user.cursor !== this.users[user.id].cursor) {
-      this.users[user.id].cursor = user.cursor;
-    }
-  }
-
-  _registerUser(user) {
-    if (!(user.id in this.users)) {
-      this.users[user.id] = user;
-      this.userCount++;
-      if (this.collecting == null)
-        this.collecting = setTimeout(() => this.collectUsers(), 5000);
-    }
-  }
-
   scheduleSave() {
     if (this.saveTimeout != null) return;
     this.saveTimeout = setTimeout(() => {
@@ -122,13 +56,10 @@ class Instance {
   }
 }
 
-async function getInstance(id, user) {
+async function getInstance(id) {
   let inst = instances[id];
   if (!inst) {
     inst = await newInstance(id);
-  }
-  if (user) {
-    inst.registerUser(user);
   }
   inst.lastActive = Date.now();
   return inst;

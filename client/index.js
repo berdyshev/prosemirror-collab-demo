@@ -1,4 +1,5 @@
 /* global Handlebars */
+import Pusher from 'pusher-js';
 import api from './api';
 import EditorConnection from './editor';
 import { Reporter } from './reporter';
@@ -28,6 +29,14 @@ async function initApp(user) {
   welcomeEl.classList.remove('hidden');
   api.defaults.headers['Auth'] = user.token;
 
+  state.pusher = new Pusher('b0e58f4fefd9168716aa', {
+    cluster: 'eu',
+    forceTLS: true,
+    auth: {
+      params: { token: user.token }
+    }
+  });
+
   const response = await api.get('/collab/articles');
   state.articles = response.data;
   showDocList();
@@ -44,7 +53,16 @@ let connection = null;
 
 // init editor for the selected document.
 async function initEditor() {
-  if (connection) connection.close();
+  if (connection) {
+    connection.close();
+    state.pushed.unsubscribe(
+      `presence-${connection.appGlobalState.currentArticle}`
+    );
+  }
+
+  state.presenceChannel = state.pusher.subscribe(
+    `presence-${state.currentArticle}`
+  );
   connection = window.connection = new EditorConnection(report, state);
   await connection.start();
 }

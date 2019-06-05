@@ -23,6 +23,8 @@
     "prosemirror-state": "^1.0.0",
     "prosemirror-transform": "^1.0.0",
     "prosemirror-view": "^1.0.0",
+    "pusher": "^2.2.0",
+    "pusher-js": "^4.4.0",
     "sqlite": "^3.0.3"
   },
   "devDependencies": {

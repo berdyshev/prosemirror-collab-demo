@@ -5,12 +5,13 @@ import crel from 'crel';
 const cursorsPlugin = new Plugin({
   state: {
     init() {
-      return [];
+      return {};
     },
     apply(tr, state) {
       const meta = tr.getMeta(cursorsPlugin);
-      if (meta && meta.userCursors) {
-        return meta.userCursors;
+      console.log(meta);
+      if (meta && meta.type === 'receive') {
+        return { ...state, [meta.cursor.id]: meta.cursor };
       }
       return state;
     }
@@ -19,18 +20,19 @@ const cursorsPlugin = new Plugin({
     decorations(state) {
       return DecorationSet.create(
         state.doc,
-        cursorsPlugin.getState(state).map(({ position, user }, index) =>
-          Decoration.widget(
-            position,
-            crel(
-              'span',
-              {
-                class: 'cursor',
-                style: `border-left-color: ${selectColor(index + 1)}`
-              },
-              crel('span', { class: 'username' }, user.name)
+        Object.values(cursorsPlugin.getState(state)).map(
+          ({ position, user }, index) =>
+            Decoration.widget(
+              position,
+              crel(
+                'span',
+                {
+                  class: 'cursor',
+                  style: `border-left-color: ${selectColor(index + 1)}`
+                },
+                crel('span', { class: 'username' }, user.name)
+              )
             )
-          )
         )
       );
     }

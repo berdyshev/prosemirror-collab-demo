@@ -3,11 +3,13 @@ const path = require('path');
 const db = require('sqlite');
 const port = process.env.PORT || 5000;
 
+const pusher = require('./pusher');
 const routing = require('./routing');
 
 const app = express();
 app.use(express.static(path.join(__dirname, '../public')));
 app.use(express.json());
+app.use(express.urlencoded());
 app.use((err, req, res, next) => {
   res.status(err.status || 500).send({ error: err.message });
 });
@@ -24,6 +26,22 @@ app.get('/', (req, res) =>
 app.post('/auth', async (req, res) => {
   const user = await db.get('SELECT * FROM users WHERE id = ?', req.body.id);
   res.json(user);
+});
+
+app.post('/pusher/auth', async (req, res) => {
+  const { socket_id: socketId, channel_name: channel, token } = req.body;
+  if (token) {
+    const user = await db.get('SELECT * from users WHERE token = ?', token);
+    const userData = {
+      user_id: user.id,
+      user_info: {
+        name: user.name
+      }
+    };
+    const auth = pusher.authenticate(socketId, channel, userData);
+    res.send(auth);
+  }
+  res.status(403).send();
 });
 
 app.use('/collab', routing);
