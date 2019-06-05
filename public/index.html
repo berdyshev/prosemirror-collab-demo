@@ -1,7 +1,12 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ProseMirror Collab Demo</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.5/css/bulma.min.css"
+    />
     <link rel="stylesheet" href="./styles/prosemirror.css" />
     <link rel="stylesheet" href="./styles/menu.css" />
     <link rel="stylesheet" href="./styles/gapcursor.css" />
@@ -9,30 +14,44 @@
     <link rel="stylesheet" href="./styles/codemirror.css" />
     <link rel="stylesheet" href="./styles/editor-base.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.1.2/handlebars.min.js"></script>
+    <script
+      defer
+      src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"
+    ></script>
     <script id="doclist-template" type="text/x-handlebars-template">
-      Select a document to edit:
-      <ol class="doc-list">
+      <nav class="panel">
+        <p class="panel-heading">Documents</p>
         {{#each articles}}
-        <li data-name="{{id}}" class="doc-item">{{name}}</li>
+          <a data-name="{{id}}" class="panel-block doc-item {{#if (eq id ../currentArticle)}}is-active{{/if}}">
+            <span class="panel-icon">
+              <i class="fas fa-book" aria-hidden="true"></i>
+            </span>
+            {{name}}
+          </a>
         {{/each}}
-      </ol>
-      <button type="button">Create a new document</button>
-    </script>
-    <script id="docinfo-template" type="text/x-handlebars-template">
-      Connected to:
-      <span id="connected">
-        <strong id="docname">{{name}}</strong>
-        <span id="users"></span>
-        <button type="button" id="changedoc">Change</button>
-      </span>
+        <div class="panel-block">
+          <button id="create-doc" class="button is-link is-outlined is-fullwidth">
+              Create a new document
+          </button>
+        </div>
+      </nav>
     </script>
   </head>
   <body>
-    <h1>ProseMirror Collab Demo</h1>
-    <h3 id="welcome" class="hidden"></h3>
-    <div id="doclist" class="hidden"></div>
-    <div id="docinfo" class="hidden"></div>
-    <div id="editor" class="hidden"></div>
+    <section class="section">
+      <div class="container">
+        <h1 class="title">ProseMirror Collab Demo</h1>
+        <p id="welcome" class="subtitle hidden"></p>
+        <div class="columns">
+          <div class="column">
+            <div id="doclist" class="hidden"></div>
+          </div>
+          <div class="column is-two-thirds">
+            <div id="editor" class="hidden"></div>
+          </div>
+        </div>
+      </div>
+    </section>
     <script src="collab.js"></script>
   </body>
 </html>

@@ -30,7 +30,7 @@ const cursorsPlugin = new Plugin({
                   class: 'cursor',
                   style: `border-left-color: ${selectColor(index + 1)}`
                 },
-                crel('span', { class: 'username' }, user.name)
+                crel('span', { class: 'username tag is-light' }, user.name)
               )
             )
         )

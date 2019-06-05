@@ -34,24 +34,6 @@
   display: none !important;
 }
 
-ol.doc-list {
-  width: 300px;
-}
-
-ol.doc-list li {
-  cursor: pointer;
-  margin-bottom: 10px;
-  color: #1870a7;
-}
-
-#docinfo,
-#doclist {
-  padding: 10px 5px;
-  border-left: 3px solid silver;
-  margin: 10px 0;
-  width: 300px;
-}
-
 .cursor {
   position: relative;
   border-left: 2px solid #afafaf;
@@ -59,12 +41,6 @@ ol.doc-list li {
 
 .cursor .username {
   position: absolute;
-  top: -16px;
+  top: -24px;
   left: -2px;
-  font-size: 10px;
-  line-height: 10px;
-  background-color: #fff;
-  border: 1px solid #afafaf;
-  padding: 2px;
-  white-space: nowrap;
 }

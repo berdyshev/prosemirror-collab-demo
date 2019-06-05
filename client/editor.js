@@ -222,7 +222,7 @@ class EditorConnection {
 
   close() {
     this.closeRequest();
-    this.appGlobalState.pusher.unsubscribe(this.channelName);
+    this.globalState.pusher.unsubscribe(this.channelName);
     this.setView(null);
   }
 
