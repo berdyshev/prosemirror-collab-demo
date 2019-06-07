@@ -48,13 +48,17 @@ class EditorConnection {
 
     this.channelName = `private-collab-${globalState.currentArticle}`;
     this.channel = globalState.pusher.subscribe(this.channelName);
+
+    this.sendChanges = this.debounce((state) => {
+      this.send(state);
+    }, 250);
+    this.sendCursor = this.debounce((data) => {
+      this.channel.trigger(`client-cursor`, data);
+    }, 250);
   }
 
   // All state changes go through this
   async dispatch(action) {
-    console.group('dispatch');
-    console.log('action', action);
-
     let newEditState = null;
     if (action.type == 'loaded') {
       // info.users.textContent = userString(action.users); // FIXME ewww
@@ -73,24 +77,20 @@ class EditorConnection {
     } else if (action.type == 'transaction') {
       newEditState = this.state.apply(action.transaction);
     }
-    console.log('next state', newEditState);
 
     if (newEditState) {
       if (
         !this.state ||
         this.state.selection.head !== newEditState.selection.head
       ) {
-        this.channel.trigger(`client-cursor`, {
+        this.sendCursor({
           position: newEditState.selection.head,
           user: this.globalState.user
         });
       }
 
-      const sendable = this.sendable(newEditState);
+      this.sendChanges(newEditState);
       this.state = newEditState;
-      if (sendable) {
-        this.send(newEditState, sendable);
-      }
     }
 
     // Sync the editor with this.state
@@ -105,8 +105,6 @@ class EditorConnection {
           })
         );
     } else this.setView(null);
-
-    console.groupEnd('dispatch');
   }
 
   // Load the document from the server and start up
@@ -147,23 +145,19 @@ class EditorConnection {
     });
   }
 
-  sendable(editState) {
-    let steps = sendableSteps(editState);
-    if (steps) {
-      return { steps };
-    }
-  }
-
   // Send the given steps to the server
-  async send(editState, { steps, ...other }) {
+  async send(editState) {
+    const sendable = sendableSteps(editState);
+
+    if (!sendable) return;
+
     try {
       let data = {
         version: getVersion(editState),
-        steps: steps ? steps.steps.map((s) => s.toJSON()) : [],
-        clientID: steps ? steps.clientID : 0,
+        steps: sendable.steps.map((s) => s.toJSON()),
+        clientID: sendable.clientID || 0,
         // pass connection socket_id on order to not receive own updates.
-        socketId: this.globalState.pusher.connection.socket_id,
-        ...other
+        socketId: this.globalState.pusher.connection.socket_id
       };
       await this.run({
         url: `/collab/events/${this.globalState.currentArticle}`,
@@ -181,11 +175,11 @@ class EditorConnection {
       return;
     }
     this.report.success();
-    let tr = steps
+    let tr = sendable
       ? receiveTransaction(
           this.state,
-          steps.steps,
-          repeat(steps.clientID, steps.steps.length)
+          sendable.steps,
+          repeat(sendable.clientID, sendable.steps.length)
         )
       : this.state.tr;
     this.dispatch({
@@ -201,11 +195,11 @@ class EditorConnection {
   }
 
   async run(config) {
-    const cancelToken = new axios.CancelToken((c) => {
-      this.cancelRequest = c;
-    });
+    // const cancelToken = new axios.CancelToken((c) => {
+    //   this.cancelRequest = c;
+    // });
     try {
-      return await api.request({ ...config, cancelToken });
+      return await api.request(config);
     } catch (err) {
       if (!axios.isCancel(err)) {
         console.error('request error', err);
@@ -234,6 +228,19 @@ class EditorConnection {
       this.container.classList.remove('hidden');
     }
     this.view = window.view = view;
+  }
+
+  debounce(fn, delay) {
+    let timeout;
+    return function(...args) {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      timeout = setTimeout(() => {
+        fn(...args);
+        timeout = null;
+      }, delay);
+    };
   }
 }
 
