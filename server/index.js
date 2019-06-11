@@ -45,18 +45,23 @@ app.post('/pusher/auth', async (req, res) => {
 });
 
 app.post('/pusher/webhook', async (req, res) => {
-  const { name, event, body, channel } = req.body;
-  if (
-    name === 'client_event' &&
-    event === 'client-changes' &&
-    channel.startsWith('private-collab-')
-  ) {
-    const [, articleId] = channel.split('private-collab-');
-    if (articleId) {
-      const user = await db.get('SELECT * FROM users WHERE id = ?', body.user);
-      await addNewEventsToInstance(articleId, body, user);
+  const { events } = req.body;
+  events.forEach(async ({ name, event, body, channel }) => {
+    if (
+      name === 'client_event' &&
+      event === 'client-changes' &&
+      channel.startsWith('private-collab-')
+    ) {
+      const [, articleId] = channel.split('private-collab-');
+      if (articleId) {
+        const user = await db.get(
+          'SELECT * FROM users WHERE id = ?',
+          body.user
+        );
+        await addNewEventsToInstance(articleId, body, user);
+      }
     }
-  }
+  });
 });
 
 app.use('/collab', routing);
