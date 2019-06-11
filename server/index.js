@@ -60,7 +60,7 @@ app.post('/pusher/webhook', async (req, res) => {
           'SELECT * FROM users WHERE id = ?',
           data.user
         );
-        await addNewEventsToInstance(articleId, data, user);
+        await routing.addNewEventsToInstance(articleId, data, user);
       }
     }
   });
