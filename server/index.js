@@ -46,20 +46,21 @@ app.post('/pusher/auth', async (req, res) => {
 
 app.post('/pusher/webhook', async (req, res) => {
   const { events } = req.body;
-  console.log('events', JSON.stringify(events));
-  events.forEach(async ({ name, event, body, channel }) => {
+  events.forEach(async ({ name, event, data: rawData, channel }) => {
     if (
       name === 'client_event' &&
       event === 'client-changes' &&
       channel.startsWith('private-collab-')
     ) {
       const [, articleId] = channel.split('private-collab-');
+      const data = JSON.parse(rawData);
+      console.log('client changes data', articleId, data);
       if (articleId) {
         const user = await db.get(
           'SELECT * FROM users WHERE id = ?',
-          body.user
+          data.user
         );
-        await addNewEventsToInstance(articleId, body, user);
+        await addNewEventsToInstance(articleId, data, user);
       }
     }
   });
