@@ -43,11 +43,12 @@ router.get('/articles/:id', async (req, res) => {
 });
 
 router.post('/events/:id', async (req, res) => {
-  const data = req.body;
-  const version = nonNegInteger(data.version);
-  const steps = data.steps.map((s) => Step.fromJSON(schema, s));
-  const instance = await getInstance(req.params.id, req.user);
-  const result = instance.addEvents(version, req.user, steps);
+  const { body, user, param } = req.body;
+  const { result, instance, steps } = await addNewEventsToInstance(
+    param.id,
+    body,
+    user
+  );
 
   if (!result) {
     const err = new Error('Version not current');
@@ -63,6 +64,14 @@ router.post('/events/:id', async (req, res) => {
     );
   }
 });
+
+async function addNewEventsToInstance(articleId, data, user) {
+  const version = nonNegInteger(data.version);
+  const steps = data.steps.map((s) => Step.fromJSON(schema, s));
+  const instance = await getInstance(articleId, user);
+  const result = instance.addEvents(version, user, steps);
+  return { result, instance, steps };
+}
 
 function formatEventsResponse(inst, steps) {
   return {
@@ -81,3 +90,4 @@ function nonNegInteger(str) {
 }
 
 module.exports = router;
+module.exports.addNewEventsToInstance = addNewEventsToInstance;

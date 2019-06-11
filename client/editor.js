@@ -48,21 +48,13 @@ class EditorConnection {
 
     this.channelName = `private-collab-${globalState.currentArticle}`;
     this.channel = globalState.pusher.subscribe(this.channelName);
-
-    this.sendChanges = this.debounce((state) => {
-      this.send(state);
-    }, 250);
-    this.sendCursor = this.debounce((data) => {
-      this.channel.trigger(`client-cursor`, data);
-    }, 250);
   }
 
   // All state changes go through this
   async dispatch(action) {
-    let newEditState = null;
     if (action.type == 'loaded') {
       // info.users.textContent = userString(action.users); // FIXME ewww
-      newEditState = EditorState.create({
+      this.state = EditorState.create({
         doc: action.doc,
         plugins: exampleSetup({
           schema,
@@ -75,22 +67,18 @@ class EditorConnection {
         ])
       });
     } else if (action.type == 'transaction') {
-      newEditState = this.state.apply(action.transaction);
-    }
-
-    if (newEditState) {
+      const newEditState = this.state.apply(action.transaction);
       if (
         !this.state ||
         this.state.selection.head !== newEditState.selection.head
       ) {
-        this.sendCursor({
+        this.channel.trigger(`client-cursor`, {
           position: newEditState.selection.head,
           user: this.globalState.user
         });
       }
 
-      this.sendChanges(newEditState);
-      this.state = newEditState;
+      this.applyNewState(newEditState);
     }
 
     // Sync the editor with this.state
@@ -127,16 +115,9 @@ class EditorConnection {
       users: data.users
     });
 
-    this.channel.bind('changes', (data) => {
-      const tr = receiveTransaction(
-        this.state,
-        data.steps.map((j) => Step.fromJSON(schema, j)),
-        data.clientIDs
-      );
-      this.dispatch({
-        type: 'transaction',
-        transaction: tr
-      });
+    this.channel.bind('client-changes', (data) => {
+      const steps = data.steps.map((j) => Step.fromJSON(schema, j));
+      this.applySteps(steps, steps.map((s) => s.clientID));
     });
     this.channel.bind('client-cursor', (cursorData) => {
       const transaction = this.state.tr;
@@ -146,45 +127,35 @@ class EditorConnection {
   }
 
   // Send the given steps to the server
-  async send(editState) {
+  applyNewState(editState) {
     const sendable = sendableSteps(editState);
 
-    if (!sendable) return;
-
-    try {
+    if (sendable) {
       let data = {
         version: getVersion(editState),
-        steps: sendable.steps.map((s) => s.toJSON()),
+        steps: sendable.steps.map((s) => {
+          s.clientID = this.globalState.user.id;
+          return s.toJSON();
+        }),
         clientID: sendable.clientID || 0,
-        // pass connection socket_id on order to not receive own updates.
-        socketId: this.globalState.pusher.connection.socket_id
+        user: this.globalState.user.id
       };
-      await this.run({
-        url: `/collab/events/${this.globalState.currentArticle}`,
-        method: 'POST',
-        data
-      });
-    } catch (err) {
-      if (err.status == 409) {
-        // The client's document conflicts with the server's version.
-        // Poll for changes and then try again.
-        console.error('Bad version');
-      } else if (badVersion(err)) {
-        this.report.failure(err.message);
-      }
-      return;
+      this.channel.trigger(`client-changes`, data);
+
+      this.state = editState;
+      this.applySteps(
+        sendable.steps,
+        repeat(sendable.clientID, sendable.steps.length)
+      );
+    } else {
+      this.state = editState;
     }
-    this.report.success();
-    let tr = sendable
-      ? receiveTransaction(
-          this.state,
-          sendable.steps,
-          repeat(sendable.clientID, sendable.steps.length)
-        )
-      : this.state.tr;
+  }
+
+  applySteps(steps, clientIDs) {
     this.dispatch({
       type: 'transaction',
-      transaction: tr
+      transaction: receiveTransaction(this.state, steps, clientIDs)
     });
   }
 
@@ -228,19 +199,6 @@ class EditorConnection {
       this.container.classList.remove('hidden');
     }
     this.view = window.view = view;
-  }
-
-  debounce(fn, delay) {
-    let timeout;
-    return function(...args) {
-      if (timeout) {
-        clearTimeout(timeout);
-      }
-      timeout = setTimeout(() => {
-        fn(...args);
-        timeout = null;
-      }, delay);
-    };
   }
 }
 
