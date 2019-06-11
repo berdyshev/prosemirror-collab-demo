@@ -46,6 +46,7 @@ app.post('/pusher/auth', async (req, res) => {
 
 app.post('/pusher/webhook', async (req, res) => {
   const { events } = req.body;
+  console.log('events', JSON.stringify(events));
   events.forEach(async ({ name, event, body, channel }) => {
     if (
       name === 'client_event' &&
