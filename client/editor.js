@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { exampleSetup, buildMenuItems } from 'prosemirror-example-setup';
-import { Step } from 'prosemirror-transform';
-import { EditorState } from 'prosemirror-state';
+import { Step, Transform } from 'prosemirror-transform';
+import { EditorState, Transaction } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { history } from 'prosemirror-history';
 import {
@@ -40,59 +40,36 @@ class EditorConnection {
   constructor(report, globalState) {
     this.report = report;
     this.globalState = globalState;
-    this.state = null;
-    this.backOff = 0;
     this.view = null;
     this.dispatch = this.dispatch.bind(this);
     this.container = document.getElementById('editor');
 
     this.channelName = `private-collab-${globalState.currentArticle}`;
     this.channel = globalState.pusher.subscribe(this.channelName);
+
+    this.sendChanges = this.debounce((state) => {
+      this.applyNewState(state);
+    }, 250);
+    this.sendCursor = this.debounce((data) => {
+      this.channel.trigger(`client-cursor`, data);
+    }, 250);
   }
 
   // All state changes go through this
-  async dispatch(action) {
-    if (action.type == 'loaded') {
-      // info.users.textContent = userString(action.users); // FIXME ewww
-      this.state = EditorState.create({
-        doc: action.doc,
-        plugins: exampleSetup({
-          schema,
-          history: false,
-          menuContent: menu.fullMenu
-        }).concat([
-          history({ preserveItems: true }),
-          collab({ version: action.version }),
-          cursor
-        ])
-      });
-    } else if (action.type == 'transaction') {
-      const newEditState = this.state.apply(action.transaction);
+  dispatch(action) {
+    if (action.type == 'transaction') {
       if (
-        !this.state ||
-        this.state.selection.head !== newEditState.selection.head
+        !action.prevState ||
+        action.prevState.selection.head !== action.state.selection.head
       ) {
-        this.channel.trigger(`client-cursor`, {
-          position: newEditState.selection.head,
+        this.sendCursor({
+          position: action.state.selection.head,
           user: this.globalState.user
         });
       }
-
-      this.applyNewState(newEditState);
+    } else if (action.type === 'update') {
+      this.sendChanges(action.state);
     }
-
-    // Sync the editor with this.state
-    if (this.state) {
-      if (this.view) this.view.updateState(this.state);
-      else
-        this.setView(
-          new EditorView(this.container, {
-            state: this.state,
-            dispatchTransaction: (transaction) =>
-              this.dispatch({ type: 'transaction', transaction })
-          })
-        );
-    } else this.setView(null);
   }
 
   // Load the document from the server and start up
@@ -107,23 +84,57 @@ class EditorConnection {
       return;
     }
     this.report.success();
-    this.backOff = 0;
-    this.dispatch({
-      type: 'loaded',
+
+    const state = EditorState.create({
       doc: schema.nodeFromJSON(data.doc),
-      version: data.version,
-      users: data.users
+      plugins: exampleSetup({
+        schema,
+        history: false,
+        menuContent: menu.fullMenu
+      }).concat([
+        history({ preserveItems: true }),
+        collab({ version: data.version }),
+        cursor
+      ])
     });
+    this.setView(
+      new EditorView(this.container, {
+        state,
+        dispatchTransaction: this.dispatchTransaction.bind(this)
+      })
+    );
 
     this.channel.bind('client-changes', (data) => {
       const steps = data.steps.map((j) => Step.fromJSON(schema, j));
       this.applySteps(steps, steps.map((s) => s.clientID));
     });
     this.channel.bind('client-cursor', (cursorData) => {
-      const transaction = this.state.tr;
+      const transaction = this.view.state.tr;
       transaction.setMeta(cursor, { type: 'receive', cursor: cursorData });
-      this.dispatch({ type: 'transaction', transaction });
+      this.view.dispatch(transaction);
     });
+  }
+
+  dispatchTransaction(transaction) {
+    const prevState = this.view.state;
+    const newState = this.view.state.apply(transaction);
+    this.view.updateState(newState);
+
+    this.dispatch({
+      type: 'transaction',
+      state: newState,
+      prevState,
+      transaction
+    });
+
+    if (transaction.docChanged) {
+      this.dispatch({
+        type: 'update',
+        state: newState,
+        prevState,
+        transaction
+      });
+    }
   }
 
   // Send the given steps to the server
@@ -134,7 +145,7 @@ class EditorConnection {
       let data = {
         version: getVersion(editState),
         steps: sendable.steps.map((s) => {
-          s.clientID = this.globalState.user.id;
+          s.clientID = sendable.clientID || 0;
           return s.toJSON();
         }),
         clientID: sendable.clientID || 0,
@@ -142,21 +153,15 @@ class EditorConnection {
       };
       this.channel.trigger(`client-changes`, data);
 
-      this.state = editState;
       this.applySteps(
         sendable.steps,
         repeat(sendable.clientID, sendable.steps.length)
       );
-    } else {
-      this.state = editState;
     }
   }
 
   applySteps(steps, clientIDs) {
-    this.dispatch({
-      type: 'transaction',
-      transaction: receiveTransaction(this.state, steps, clientIDs)
-    });
+    this.view.dispatch(receiveTransaction(this.view.state, steps, clientIDs));
   }
 
   closeRequest() {
@@ -199,6 +204,19 @@ class EditorConnection {
       this.container.classList.remove('hidden');
     }
     this.view = window.view = view;
+  }
+
+  debounce(fn, delay) {
+    let timeout;
+    return function(...args) {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+      timeout = setTimeout(() => {
+        fn(...args);
+        timeout = null;
+      }, delay);
+    };
   }
 }
 
