@@ -1,4 +1,5 @@
 const express = require('express');
+const cors = require('cors');
 const path = require('path');
 const db = require('sqlite');
 const port = process.env.PORT || 5000;
@@ -10,6 +11,7 @@ const app = express();
 app.use(express.static(path.join(__dirname, '../public')));
 app.use(express.json());
 app.use(express.urlencoded());
+app.use(cors());
 app.use((err, req, res, next) => {
   res.status(err.status || 500).send({ error: err.message });
 });
